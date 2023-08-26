@@ -49,6 +49,7 @@ void sharpUpdate(uint32_t u32Mask);
 void sharpRotation(int iAngle);
 void sharpInit(int iSpeed, uint8_t u8CS);
 void sharpFill(uint8_t u8Pattern);
+void sharpInvert(void);
 void sharpDrawSprite(int x, int y, int cx, int cy, uint8_t *pData, int iPitch, int bInvert);
 void sharpWriteBuffer(void);
 int sharpGetCursorX(void);

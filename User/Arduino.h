@@ -20,7 +20,7 @@
 #ifndef USER_ARDUINO_H_
 #define USER_ARDUINO_H_
 
-//#define BITBANG
+#define BITBANG
 // GPIO pin states
 enum {
 	OUTPUT = 0,

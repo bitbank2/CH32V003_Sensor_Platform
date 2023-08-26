@@ -19,8 +19,13 @@
 struct tm myTime;
 
 // Hardware connections. The hex value represents the port (upper nibble) and GPIO pin (lower nibble)
-#define LCD_CS 0xd3
-#define LCD_VCOM 0xd4
+// QFN20 PCB
+//#define LCD_CS 0xd3
+//#define LCD_VCOM 0xd4
+// TSSOP20 PCB
+#define LCD_CS 0xc7
+#define LCD_VCOM 0xd3
+
 #define LED_PIN 0xd6
 #define SDA_PIN 0xc1
 #define SCL_PIN 0xc2
@@ -28,6 +33,7 @@ struct tm myTime;
 #define BUTTON1_PIN 0xd5
 
 int iSensor;
+uint8_t bInvert = 0; // invert the LCD colors
 extern uint32_t _iUV;
 
 const char *szSensorNames[] = {"Unknown", "LTR390", "SCD4x", "LSM6DS3", "RV3032", "DS3231"};
@@ -82,11 +88,6 @@ int i2str(char *pDest, int iVal)
         return (int)(d - pDest - 1); // string length
 } /* i2str() */
 
-void SetTime(void)
-{
-
-} /* SetTime() */
-
 // Convert a number into a zero-terminated string
 void i2strf(char *pDest, int iVal, int iDigits)
 {
@@ -101,24 +102,123 @@ void i2strf(char *pDest, int iVal, int iDigits)
         }
 } /* i2strf() */
 
+void SetTime(void)
+{
+	int i, iFlash, iCount = 100, iTick = 0, iCursor = 0, bDone = 0;
+	int iButts, iOldButts = 0;
+	char szTemp[16];
+	struct tm myTime;
+
+	while (!bDone) {
+
+		rtcGetTime(&myTime);
+		iFlash = ((iTick & 15) > 3);
+		sharpFill(bInvert);
+		sharpWriteString(128,2,"Next", FONT_8x8, bInvert);
+		sharpWriteString(152,58, "+", FONT_8x8, bInvert);
+		sharpWriteString(16,2, "Set Time", FONT_12x16, bInvert);
+	    i2strf(szTemp, myTime.tm_mday, 2);
+	    if (iCursor != 0 || (iCursor == 0 && iFlash))
+           sharpWriteString(0, 18, szTemp, FONT_12x16, bInvert);
+	    sharpWriteString(24, 18, "/", FONT_12x16, bInvert);
+
+	    i = myTime.tm_mon+1;
+	    i2strf(szTemp, i, 2);
+	    if (iCursor != 1 || (iCursor == 1 && iFlash))
+           sharpWriteString(36, 18, szTemp, FONT_12x16, bInvert);
+	    sharpWriteString(60, 18, "/", FONT_12x16, bInvert);
+
+	    i = myTime.tm_year % 100;
+	    i2strf(szTemp, i+2000, 2);
+	    if (iCursor != 2 || (iCursor == 2 && iFlash))
+           sharpWriteString(72, 18, szTemp, FONT_12x16, bInvert);
+
+	    i2strf(szTemp, myTime.tm_hour, 2);
+	    szTemp[2] = ':';
+	    szTemp[3] = 0;
+	    if (iCursor != 3 || (iCursor == 3 && iFlash))
+           sharpWriteString(2, 34, szTemp, FONT_12x16, bInvert);
+	    i2strf(szTemp, myTime.tm_min, 2);
+	    szTemp[2] = ':';
+	    szTemp[3] = 0;
+	    if (iCursor != 4 || (iCursor == 4 && iFlash))
+           sharpWriteString(38, 34, szTemp, FONT_12x16, bInvert);
+	    i2strf(szTemp, myTime.tm_sec, 2);
+	    if (iCursor != 5 || (iCursor == 5 && iFlash))
+           sharpWriteString(74, 34, szTemp, FONT_12x16, bInvert);
+	    iButts = GetButtons();
+	    if (iButts == 3) { // user wants to exit without setting the time
+	    	bDone = 1;
+	    }
+	    if (iCursor != 6 || (iCursor == 6 && iFlash))
+	    	sharpWriteString(56, 50, "Done", FONT_12x16, bInvert);
+	    if (iOldButts == 0 && iButts == 1) { // advance cursor
+	    	iCursor++;
+	    	if (iCursor > 6) iCursor = 0;
+	    }
+	    if (iOldButts == 0) iCount = 0; // reset "button held" counter
+	    if (iButts == 2) iCount++;
+	    if (iCount == 1 || iCount > 24) { // adjust value
+	    	switch (iCursor) {
+	    	case 0: // day of the month
+	    		myTime.tm_mday++;
+	    		if (myTime.tm_mday > 31) myTime.tm_mday = 0;
+	    		break;
+	    	case 1: // month
+	    		myTime.tm_mon++;
+	    		if (myTime.tm_mon > 11) myTime.tm_mon = 0;
+	    		break;
+	    	case 2: // year
+	    		myTime.tm_year++;
+	    		myTime.tm_year = (myTime.tm_year % 100) + 100;
+	    		break;
+	    	case 3: // hour
+	    		myTime.tm_hour++;
+	    		if (myTime.tm_hour > 23) myTime.tm_hour = 0;
+	    		break;
+	    	case 4: // minute
+	    		myTime.tm_min++;
+	    		if (myTime.tm_min > 59) myTime.tm_min = 0;
+	    		break;
+	    	case 5: // second
+	    		myTime.tm_sec++;
+	    		if (myTime.tm_sec > 59) myTime.tm_sec = 0;
+	    		break;
+	    	case 6:
+	    		// set the time and leave
+	    		rtcSetTime(&myTime);
+	    		sharpFill(bInvert);
+	            sharpWriteBuffer();
+	    		return;
+	    	}
+	    }
+	    iOldButts = iButts;
+        sharpWriteBuffer();
+        Delay_Ms(33);
+        iTick++;
+	} // while !bDone
+} /* SetTime() */
+
 void ShowTime(void)
 {
 char szTemp[16];
 
-	sharpFill(0);
+	sharpFill(bInvert);
+	sharpWriteString(136, 2, "Set", FONT_8x8, bInvert);
+	sharpWriteString(112, 58, "Invert", FONT_8x8, bInvert);
 	rtcGetTime(&myTime);
    	i2strf(szTemp, myTime.tm_hour, 2);
    	szTemp[2] = ':';
    	i2strf(&szTemp[3], myTime.tm_min, 2);
-   	sharpWriteStringCustom(&Roboto_Black_40, 2, 36, szTemp, 1, 1);
+   	sharpWriteStringCustom(&Roboto_Black_40, 2, 36, szTemp, !bInvert, 1);
    	i2strf(szTemp, myTime.tm_sec, 2);
-   	sharpWriteString(112, 18, szTemp, FONT_12x16, 0);
+   	sharpWriteString(112, 18, szTemp, FONT_12x16, bInvert);
    	i2strf(szTemp, myTime.tm_mday, 2);
    	szTemp[2] = '/';
    	i2strf(&szTemp[3], myTime.tm_mon+1, 2);
    	szTemp[5] = '/';
    	i2strf(&szTemp[6], myTime.tm_year + 1900, 4);
-   	sharpWriteString(2, 52, szTemp, FONT_12x16, 0);
+   	sharpWriteString(2, 42, szTemp, FONT_12x16, bInvert);
    	sharpWriteBuffer();
 } /* ShowTime() */
 
@@ -128,23 +228,23 @@ int iUVI;
 char szTemp[16];
 int i;
 
-    sharpFill(0);
-	sharpWriteString(24, 6, "UVI   Max", FONT_12x16, 0);
+    sharpFill(bInvert);
+	sharpWriteString(24, 6, "UVI   Max", FONT_12x16, bInvert);
 	iUVI = ltr390_getUVI(iValue); // instaneous value
 	i2str(szTemp, iUVI/10); // whole part
-    sharpWriteStringCustom(&Roboto_Black_40, 0, 62, szTemp, 1, 0);
-    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, ".", 1, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, 0, 62, szTemp, !bInvert, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, ".", !bInvert, 0);
 	i = iUVI % 10; // 10ths
 	i2str(szTemp, i);
-    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, szTemp, 1, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, szTemp, !bInvert, 0);
 
 	iUVI = ltr390_getUVI(iMax); // max value from the last 3.2 seconds
 	i2str(szTemp, iUVI/10); // whole part
-    sharpWriteStringCustom(&Roboto_Black_40, 84, 62, szTemp, 1, 0);
-    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, ".", 1, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, 84, 62, szTemp, !bInvert, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, ".", !bInvert, 0);
 	i = iUVI % 10; // 10ths
 	i2str(szTemp, i);
-    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, szTemp, 1, 0);
+    sharpWriteStringCustom(&Roboto_Black_40, -1, 62, szTemp, !bInvert, 0);
 // DEBUG
 //    i2str(szTemp, iValue);
 //	sharpWriteString(2, 22, szTemp, FONT_8x8, 0);
@@ -219,18 +319,18 @@ uint8_t i, y;
 int iBad = 0;
 char szTemp[16];
 
+I2CInit(SDA_PIN, SCL_PIN, 100000);
 scan_again:
 	sharpFill(0);
-    sharpWriteString(4, 2, "I2C Bus Scan", FONT_12x16, 0);
+    sharpWriteString(4, 12, "I2C Bus Scan", FONT_12x16, 0);
 	sharpWriteBuffer();
 	while (GetButtons() != 0) {
 		Delay_Ms(100);
 	}
-	I2CInit(SDA_PIN, SCL_PIN, 100000);
-	y = 18;
+	y = 28;
 	for (i=4; i<128 && iSensor == SENSOR_UNKNOWN && iBad < 10; i++) {
 		digitalWrite(LED_PIN, i & 1);
-	    sharpWriteString(2, 18, "0x", FONT_8x8, 0);
+	    sharpWriteString(2, y, "0x", FONT_8x8, 0);
 	    i2hex(szTemp, i);
 	    sharpWriteString(-1, -1, szTemp, FONT_8x8, 0);
 		sharpWriteBuffer();
@@ -263,11 +363,28 @@ scan_again:
 		}
 		goto scan_again;
 	}
-	sharpWriteString(2, y, "Press button to start", FONT_6x8, 0);
-	sharpWriteBuffer();
-	while (GetButtons() == 0) {
-		Delay_Ms(25);
-	}
+	i = 0;
+	sharpWriteString(118, 2, "Start", FONT_8x8, 0);
+	sharpWriteString(110, 58, "Invert", FONT_8x8, 0);
+	while (i == 0) { // wait for user to start or invert the colors
+		sharpWriteBuffer();
+		while (GetButtons() == 0) {
+			Delay_Ms(25);
+		}
+		if (GetButtons() == 1) {
+			while (GetButtons() != 0) {}; // wait for the user to release the button
+			i = 1; // break out of loop and start sensing
+		}
+		if (GetButtons() == 2) {
+			bInvert = ~bInvert;
+			sharpInvert();
+			sharpWriteBuffer();
+			while (GetButtons() != 0) {
+				// wait for button release
+				Delay_Ms(25);
+			}
+		}
+	} // while waiting for user to start
 } /* ScanBus() */
 
 void TIM2_PWMOut_Init(u16 arr, u16 psc, u16 ccp)
@@ -334,29 +451,29 @@ void ShowCO2(void)
 	int i, x;
 	char szTemp[32];
 
-			sharpFill(0);
+			sharpFill(bInvert);
 	        i = i2str(szTemp, (int)_iCO2);
-	        sharpWriteStringCustom(&Roboto_Black_40, 0, 32, szTemp, 1, 1);
+	        sharpWriteStringCustom(&Roboto_Black_40, 0, 32, szTemp, !bInvert, 1);
 	        x = sharpGetCursorX();
 	        if (i < 4) {
-	           sharpWriteString(x+24, 0, "  ", FONT_12x16, 0); // make sure old data is erased if going from 4 to 3 digits
-	           sharpWriteString(x, 16, "   ", FONT_12x16, 0);
+	           sharpWriteString(x+24, 0, "  ", FONT_12x16, bInvert); // make sure old data is erased if going from 4 to 3 digits
+	           sharpWriteString(x, 16, "   ", FONT_12x16, bInvert);
 	        }
-	        sharpWriteString(x, 2, "CO2", FONT_8x8, 0);
-	        sharpWriteString(x, 10, "ppm", FONT_8x8, 0);
+	        sharpWriteString(x, 2, "CO2", FONT_8x8, bInvert);
+	        sharpWriteString(x, 10, "ppm", FONT_8x8, bInvert);
 
-	        sharpWriteString(2, 36, "Temp ", FONT_12x16, 0);
+	        sharpWriteString(2, 36, "Temp ", FONT_12x16, bInvert);
 	        i2str(szTemp, _iTemperature/10); // whole part
-	        sharpWriteString(-1, 36, szTemp, FONT_12x16, 0);
+	        sharpWriteString(-1, 36, szTemp, FONT_12x16, bInvert);
 	        i2str(szTemp, _iTemperature % 10); // fraction
-	        sharpWriteString(-1, 36, ".", FONT_12x16, 0);
-	        sharpWriteString(-1, 36, szTemp, FONT_12x16, 0);
-	        sharpWriteString(-1, 36, "C", FONT_12x16, 0);
+	        sharpWriteString(-1, 36, ".", FONT_12x16, bInvert);
+	        sharpWriteString(-1, 36, szTemp, FONT_12x16, bInvert);
+	        sharpWriteString(-1, 36, "C", FONT_12x16, bInvert);
 
-	        sharpWriteString(2, 52, "Humid ", FONT_12x16, 0);
+	        sharpWriteString(2, 52, "Humidity ", FONT_12x16, bInvert);
 	        i2str(szTemp, _iHumidity/10); // throw away fraction since it's not accurate
-	        sharpWriteString(-1, 52, szTemp, FONT_12x16, 0);
-	        sharpWriteString(-1, 52, "%", FONT_12x16, 0);
+	        sharpWriteString(-1, 52, szTemp, FONT_12x16, bInvert);
+	        sharpWriteString(-1, 52, "%", FONT_12x16, bInvert);
 	        sharpWriteBuffer();
 } /* ShowCO2() */
 
@@ -394,14 +511,24 @@ void RunSCD4X(void)
 
 void RunRTC(void)
 {
+	int iTick = 0;
 	rtcInit((iSensor == SENSOR_DS3231) ? RTC_DS3231 : RTC_RV3032, SDA_PIN, SCL_PIN);
 	rtcGetTime(&myTime);
-	if (myTime.tm_year == 0) {
-		SetTime();
-	}
 	while (1) {
-		ShowTime();
-		Delay_Ms(1000);
+		if (GetButtons() == 1) {
+			while (GetButtons() != 0) {};
+			SetTime();
+		} else if (GetButtons() == 2) {
+			bInvert = ~bInvert;
+			sharpInvert();
+			sharpWriteBuffer();
+			while (GetButtons() != 0) {};
+		}
+		Delay_Ms(33);
+		if ((iTick & 0x1f) == 0) {
+			ShowTime();
+		}
+		iTick++;
 	}
 } /* RunRTC() */
 

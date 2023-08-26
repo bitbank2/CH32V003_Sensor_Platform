@@ -352,6 +352,20 @@ void sharpFill(uint8_t u8Pattern)
 	}
 } /* sharpFill() */
 
+void sharpInvert(void)
+{
+	uint8_t *d;
+	int i, j;
+
+	while (bDMA) {}; // can't change the buffer while DMA is active because we only have 1!!!
+	d = sharpGetBuffer();
+	for (i=0; i<LCD_HEIGHT; i++) {
+		for (j=0; j<(LCD_WIDTH>>3); j++) {
+			d[j] = ~d[j];
+		} // for j
+		d += LCD_PITCH;
+	} // for i
+} /* sharpInvert() */
 void sharpDrawSprite(int x, int y, int cx, int cy, uint8_t *pSprite, int iPitch, int bInvert)
 {
     int tx, ty, dx, dy, iStartX;
@@ -601,11 +615,6 @@ unsigned char c, ucDstMask, ucSrcMask, *d, *s, uc, ucInvert;
               s = (unsigned char *)&ucSmallFont[(int)c*5];
               ucTemp[0] = 0; // first column is blank
               memcpy(&ucTemp[1], s, 5);
-              if (bInvert) {
-                  for (tx=0; tx<6; tx++) {
-                	  ucTemp[tx] = ~ucTemp[tx];
-                  }
-              }
               // Stretch the font to double width + double height
               memset(&ucTemp[6], 0, 24); // write 24 new bytes
               for (tx=0; tx<6; tx++)
@@ -679,6 +688,12 @@ unsigned char c, ucDstMask, ucSrcMask, *d, *s, uc, ucInvert;
               iLen = 12;
               if (x + iLen > LCD_WIDTH) // clip right edge
                   iLen = LCD_WIDTH - x;
+              if (bInvert) {
+                  for (tx=0; tx<iLen; tx++) {
+                	  ucTemp[tx+6] = ~ucTemp[tx+6];
+                	  ucTemp[tx+18] = ~ucTemp[tx+18];
+                  }
+              }
               for (tx=0; tx<iLen; tx++, x++) {
                   ucDstMask = 0x80 >> (x & 7);
                   ucSrcMask = 1;
@@ -690,11 +705,13 @@ unsigned char c, ucDstMask, ucSrcMask, *d, *s, uc, ucInvert;
                 		  d[0] |= ucDstMask;
                 	  else
                 		  d[0] &= ~ucDstMask;
-                	  ucSrcMask <<= 1;
-                	  if (s[12] & ucSrcMask)
-                		  d[LCD_PITCH*8] |= ucDstMask;
-                	  else
-                		  d[LCD_PITCH*8] &= ~ucDstMask;
+                	  if (ty != 7) {
+                		  ucSrcMask <<= 1;
+                		  if (s[12] & ucSrcMask)
+                			  d[LCD_PITCH*8] |= ucDstMask;
+                		  else
+                			  d[LCD_PITCH*8] &= ~ucDstMask;
+                	  }
                 	  d += LCD_PITCH;
                   } // for ty
               } // for tx

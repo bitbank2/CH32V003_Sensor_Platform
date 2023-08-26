@@ -259,7 +259,7 @@ int rc;
 //return (rc == 1) ? (iOldLen - iLen) : 0; // 0 indicates bad ack from sending a byte
 } /* I2CWrite() */
 
-void I2CRead(uint8_t addr, uint8_t *pData, int iLen)
+int I2CRead(uint8_t addr, uint8_t *pData, int iLen)
 {
    i2cBegin(addr, 1);
    while (iLen--)
@@ -267,6 +267,7 @@ void I2CRead(uint8_t addr, uint8_t *pData, int iLen)
       *pData++ = i2cByteIn(iLen == 0);
    } // for each byte
    i2cEnd();
+   return 1;
 } /* I2CRead() */
 
 int I2CTest(uint8_t addr)
@@ -392,7 +393,10 @@ int I2CTest(uint8_t u8Addr)
 
 	I2C_ClearFlag(I2C1, I2C_FLAG_AF);
     I2C_GenerateSTART( I2C1, ENABLE );
-    while( !I2C_CheckEvent( I2C1, I2C_EVENT_MASTER_MODE_SELECT ) );
+    while(iTimeout < 10000 && !I2C_CheckEvent( I2C1, I2C_EVENT_MASTER_MODE_SELECT ) ) {
+    	iTimeout++;
+    }
+    if (iTimeout >= 10000) return 0; // no pull-ups, open bus
 
     I2C_Send7bitAddress( I2C1, u8Addr<<1, I2C_Direction_Transmitter );
 
