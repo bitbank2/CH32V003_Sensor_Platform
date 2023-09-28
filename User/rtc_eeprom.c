@@ -28,82 +28,6 @@ static int iRTCType;
 static int iRTCAddr;
 
 //
-// Read a byte from the EEPROM
-//
-void eeReadByte(int iAddr, unsigned char *pData)
-{
-unsigned char ucTemp[4];
-
-  if (iAddr != -1) // set the address
-  {
-    ucTemp[0] = (unsigned char)(iAddr >> 8);
-    ucTemp[1] = (unsigned char)iAddr;
-    I2CWrite(EEPROM_ADDR, ucTemp, 2);
-    delay(10);
-  }
-  // otherwise just read from the last address and auto-increment
-  I2CRead(EEPROM_ADDR, pData, 1);
-} /* eeReadByte() */
-//
-// Read a block of 32 bytes from the given address
-// or from the last read address if iAddr == -1
-//
-void eeReadBlock(int iAddr, unsigned char *pData)
-{
-unsigned char ucTemp[4];
-
-  if (iAddr != -1) // set the address
-  {
-    ucTemp[0] = (unsigned char)(iAddr >> 8);
-    ucTemp[1] = (unsigned char)iAddr;
-    I2CWrite(EEPROM_ADDR, ucTemp, 2);
-  }
-  // otherwise just read from the last address and auto-increment
-  I2CRead(EEPROM_ADDR, pData, 32);
-} /* eeReadBlock() */
-//
-// Write a byte to the given address
-// or the previous address if iAddr == -1
-//
-void eeWriteByte(int iAddr, unsigned char ucByte)
-{
-unsigned char ucTemp[4];
-
-        if (iAddr != -1) // send the address
-        {
-                ucTemp[0] = (unsigned char)(iAddr >> 8);
-                ucTemp[1] = (unsigned char)iAddr;
-                ucTemp[2] = ucByte;
-                // The first data byte must be written with
-                // the address atomically or it won't work
-                I2CWrite(EEPROM_ADDR, ucTemp, 3);
-        } // otherwise write from the last address and increment
-        else
-        {
-                I2CWrite(EEPROM_ADDR, &ucByte, 1);
-        }
-} /* eeWriteByte() */
-//
-// Write a block of 32 bytes to the given address
-// or from the last read/write address is iAddr == -1
-//
-void eeWriteBlock(int iAddr, unsigned char *pData)
-{
-unsigned char ucTemp[34];
-
-        if (iAddr != -1) // send the address
-        {
-                ucTemp[0] = (unsigned char)(iAddr >> 8);
-                ucTemp[1] = (unsigned char)iAddr;
-                memcpy(&ucTemp[2], pData, 32);
-                I2CWrite(EEPROM_ADDR, ucTemp, 34);
-        } // otherwise write to the last address and increment
-        else
-        {
-                I2CWrite(EEPROM_ADDR, pData, 32);
-        }
-} /* eeWriteBlock() */
-//
 // Turn on the RTC
 // returns 1 for success, 0 for failure
 //
@@ -118,8 +42,8 @@ uint8_t ucTemp[4];
      iRTCAddr = RTC_DS3231_ADDR;
   else if (iRTCType == RTC_RV3032)
      iRTCAddr = RTC_RV3032_ADDR;
-  else
-     iRTCAddr = RTC_PCF8563_ADDR;
+//  else
+//     iRTCAddr = RTC_PCF8563_ADDR;
 
   I2CInit(iSDA, iSCL, 50000); // initialize the bit bang library
   if (iType == RTC_DS3231) {
@@ -131,12 +55,13 @@ uint8_t ucTemp[4];
     ucTemp[0] = 0xc0; // EEPROM PMU
     ucTemp[1] = 0x10; // enable direct VBACKUP switchover, disable trickle charge
     I2CWrite(iRTCAddr, ucTemp, 2);
-  } else { // PCF8563
-    ucTemp[0] = 0; // control_status_1
-    ucTemp[1] = 0; // normal mode, clock on, power-on-reset disabled
-    ucTemp[2] = 0; // disable all alarms
-    I2CWrite(iRTCAddr, ucTemp, 3);
   }
+//  else { // PCF8563
+//    ucTemp[0] = 0; // control_status_1
+//    ucTemp[1] = 0; // normal mode, clock on, power-on-reset disabled
+//    ucTemp[2] = 0; // disable all alarms
+//    I2CWrite(iRTCAddr, ucTemp, 3);
+//  }
   return 1;
 } /* rtcInit() */
 //
@@ -190,8 +115,9 @@ int i;
           ucTemp[1] = 0x40 | (c << 3); // enable SQW, disable interrupts
        }
        I2CWrite(iRTCAddr, ucTemp, 2);
-   } else if (iRTCType == RTC_PCF8563) {
    }
+ //  else if (iRTCType == RTC_PCF8563) {
+ //  }
 } /* rtcSetFreq() */
 //
 // Get the UNIX epoch time
@@ -305,6 +231,7 @@ uint8_t ucTemp[8];
         break;
      } // switch on type
   }
+#ifdef FUTURE
   else if (iRTCType == RTC_PCF8563)
   {
     switch (type)
@@ -374,6 +301,7 @@ uint8_t ucTemp[8];
         break;
      } // switch on alarm type
    } // PCF8563
+#endif // FUTURE
   else if (iRTCType == RTC_RV3032) {
      switch (type)
      {
@@ -462,6 +390,7 @@ uint8_t i;
         // year
         ucTemp[7] = (((pTime->tm_year % 100)/10) << 4);
         ucTemp[7] |= (pTime->tm_year % 10);
+#ifdef FUTURE
     } else if (iRTCType == RTC_PCF8563) {
         ucTemp[0] = 2; // start at register 2
         // seconds
@@ -487,6 +416,7 @@ uint8_t i;
         // year
         ucTemp[7] = (((pTime->tm_year % 100)/10) << 4);
         ucTemp[7] |= (pTime->tm_year % 10);
+#endif // FUTURE
     } else if (iRTCType == RTC_RV3032) {
 // Values are stored as BCD
         ucTemp[0] = 1; // start at register 1

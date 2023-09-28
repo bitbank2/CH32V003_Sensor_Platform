@@ -705,13 +705,11 @@ unsigned char c, ucDstMask, ucSrcMask, *d, *s, uc, ucInvert;
                 		  d[0] |= ucDstMask;
                 	  else
                 		  d[0] &= ~ucDstMask;
-                	  if (ty != 7) {
-                		  ucSrcMask <<= 1;
-                		  if (s[12] & ucSrcMask)
-                			  d[LCD_PITCH*8] |= ucDstMask;
-                		  else
-                			  d[LCD_PITCH*8] &= ~ucDstMask;
-                	  }
+               		  if (s[12] & ucSrcMask)
+               			  d[LCD_PITCH*8] |= ucDstMask;
+               		  else
+               			  d[LCD_PITCH*8] &= ~ucDstMask;
+               		  ucSrcMask <<= 1;
                 	  d += LCD_PITCH;
                   } // for ty
               } // for tx

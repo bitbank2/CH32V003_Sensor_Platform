@@ -64,7 +64,7 @@ int scd41_start(int iPowerMode)
 // Start correct mode
      scd41_wakeup();
      _iPowerMode = iPowerMode;
-     scd41_sendCMD2(SCD41_CMD_SET_AUTOMATIC_SELF_CALIBRATION_ENABLED, 1);
+     scd41_sendCMD2(SCD41_CMD_SET_AUTOMATIC_SELF_CALIBRATION_ENABLED, 0); // turn off self-calibration
      Delay_Ms(5);
      if (iPowerMode == SCD_POWERMODE_NORMAL)
         scd41_sendCMD(SCD41_CMD_START_PERIODIC_MEASUREMENT);
